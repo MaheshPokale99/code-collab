@@ -1,0 +1,119 @@
+@import url("tldraw/tldraw.css");
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+    --primary-color: #6366f1;
+    --primary-hover: #4f46e5;
+    --background: #0f172a;
+    --surface: #1e293b;
+    --text: #f8fafc;
+    --text-secondary: #94a3b8;
+    --border: #334155;
+    --success: #22c55e;
+    --error: #ef4444;
+    --radius: 0.5rem;
+}
+
+@layer base {
+    body {
+        @apply bg-background text-text min-h-screen antialiased;
+        background-image: 
+            radial-gradient(circle at 100% 0%, rgba(124, 58, 237, 0.15) 0%, transparent 50%),
+            radial-gradient(circle at 0% 100%, rgba(16, 185, 129, 0.15) 0%, transparent 50%);
+    }
+}
+
+@layer components {
+    .view-title {
+        @apply mb-4 w-full border-b border-border pb-3 text-start text-xl font-semibold text-text;
+    }
+
+    .input-field {
+        @apply w-full rounded-lg border border-border bg-surface px-4 py-3 text-text 
+        placeholder:text-text-muted backdrop-blur-sm
+        focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 
+        transition-all duration-200 hover:border-border-light;
+    }
+
+    .btn-primary {
+        @apply relative w-full overflow-hidden rounded-lg bg-primary px-6 py-3 text-lg font-semibold text-white 
+        transition-all duration-200 hover:bg-primary-hover focus:outline-none focus:ring-2 
+        focus:ring-primary focus:ring-offset-2 focus:ring-offset-background
+        before:absolute before:inset-0 before:bg-gradient-to-r before:from-primary-light/20 before:to-transparent
+        before:opacity-0 before:transition-opacity hover:before:opacity-100;
+    }
+
+    .btn-secondary {
+        @apply text-text-secondary hover:text-text transition-colors duration-200 
+        hover:underline hover:underline-offset-4;
+    }
+
+    .card {
+        @apply rounded-lg border border-border bg-surface p-6 shadow-lg transition-all duration-200
+        hover:shadow-glow-sm hover:border-border-light;
+    }
+
+    .glass-panel {
+        @apply rounded-lg border border-border/50 bg-surface/80 p-6 backdrop-blur-sm
+        shadow-lg transition-all duration-200 hover:shadow-glow-sm;
+    }
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+    @apply w-2 h-2;
+}
+
+::-webkit-scrollbar-track {
+    @apply bg-surface-dark rounded;
+}
+
+::-webkit-scrollbar-thumb {
+    @apply bg-border rounded hover:bg-border-light transition-colors duration-200;
+}
+
+/* Editor Styles */
+.cm-editor {
+    @apply max-h-[93vh] bg-surface rounded-lg border border-border;
+}
+
+.cm-editor .cm-scroller {
+    @apply font-mono text-text;
+}
+
+/* Animations */
+@keyframes float {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-10px); }
+}
+
+.animate-float {
+    animation: float 3s ease-in-out infinite;
+}
+
+/* Responsive Design */
+@media screen and (max-width: 768px) {
+    .cm-editor {
+        @apply max-h-[calc(93vh-60px)];
+    }
+
+    .cm-editor .cm-scroller {
+        @apply min-h-[calc(93vh-60px)];
+    }
+}
+
+/* Github Corner */
+.github-corner:hover .octo-arm {
+    animation: octocat-wave 560ms ease-in-out;
+}
+
+@keyframes octocat-wave {
+    0%, 100% { transform: rotate(0); }
+    20%, 60% { transform: rotate(-25deg); }
+    40%, 80% { transform: rotate(10deg); }
+}

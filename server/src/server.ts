@@ -23,7 +23,7 @@ const io = new Server(server, {
 		origin: "*",
 	},
 	maxHttpBufferSize: 1e8,
-	pingTimeout: 60000,
+	pingTimeout: 6000,
 })
 
 let userSocketMap: User[] = []

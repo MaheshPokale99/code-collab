@@ -11,15 +11,15 @@ function SplitterComponent({ children }: { children: ReactNode }) {
 
     const getGutter = () => {
         const gutter = document.createElement("div")
-        gutter.className = "h-full cursor-e-resizer hidden md:block"
-        gutter.style.backgroundColor = "#e1e1ffb3"
+        gutter.className = "h-full cursor-e-resize hidden md:block"
+        gutter.style.backgroundColor = "rgba(255, 255, 255, 0.1)"
         return gutter
     }
 
     const getSizes = () => {
         if (isMobile) return [0, width]
         const savedSizes = getItem("editorSizes")
-        let sizes = [35, 65]
+        let sizes = [25, 75]
         if (savedSizes) {
             sizes = JSON.parse(savedSizes)
         }
@@ -28,12 +28,12 @@ function SplitterComponent({ children }: { children: ReactNode }) {
 
     const getMinSizes = () => {
         if (isMobile) return [0, width]
-        return isSidebarOpen ? [350, 350] : [50, 0]
+        return isSidebarOpen ? [320, 500] : [50, 0]
     }
 
     const getMaxSizes = () => {
         if (isMobile) return [0, Infinity]
-        return isSidebarOpen ? [Infinity, Infinity] : [0, Infinity]
+        return isSidebarOpen ? [500, Infinity] : [0, Infinity]
     }
 
     const handleGutterDrag = (sizes: number[]) => {
@@ -41,7 +41,8 @@ function SplitterComponent({ children }: { children: ReactNode }) {
     }
 
     const getGutterStyle = () => ({
-        width: "7px",
+        width: "1px",
+        backgroundColor: "rgba(255, 255, 255, 0.1)",
         display: isSidebarOpen && !isMobile ? "block" : "none",
     })
 
@@ -58,7 +59,7 @@ function SplitterComponent({ children }: { children: ReactNode }) {
             snapOffset={30}
             gutterStyle={getGutterStyle}
             onDrag={handleGutterDrag}
-            className="flex h-screen min-h-screen max-w-full items-center justify-center overflow-hidden"
+            className="flex h-full w-full items-stretch overflow-hidden"
         >
             {children}
         </Split>

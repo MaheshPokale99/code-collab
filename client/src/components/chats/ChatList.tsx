@@ -1,68 +1,117 @@
 import { useAppContext } from "@/context/AppContext"
 import { useChatRoom } from "@/context/ChatContext"
-import { SyntheticEvent, useEffect, useRef } from "react"
+import { useSocket } from "@/context/SocketContext"
+import { SocketEvent } from "@/types/socket"
+import { User } from "@/types/user"
+import { SyntheticEvent, useEffect, useRef, useState } from "react"
+import { LuUser } from "react-icons/lu"
 
 function ChatList() {
-    const {
-        messages,
-        isNewMessage,
-        setIsNewMessage,
-        lastScrollHeight,
-        setLastScrollHeight,
-    } = useChatRoom()
     const { currentUser } = useAppContext()
-    const messagesContainerRef = useRef<HTMLDivElement | null>(null)
-
-    const handleScroll = (e: SyntheticEvent) => {
-        const container = e.target as HTMLDivElement
-        setLastScrollHeight(container.scrollTop)
-    }
-
-    // Scroll to bottom when messages change
-    useEffect(() => {
-        if (!messagesContainerRef.current) return
-        messagesContainerRef.current.scrollTop =
-            messagesContainerRef.current.scrollHeight
-    }, [messages])
+    const { socket } = useSocket()
+    const { messages, isNewMessage, setIsNewMessage, lastScrollHeight, setLastScrollHeight } = useChatRoom()
+    const messagesContainerRef = useRef<HTMLDivElement>(null)
+    const [typingUsers, setTypingUsers] = useState<string[]>([])
 
     useEffect(() => {
-        if (isNewMessage) {
-            setIsNewMessage(false)
+        // Handle typing indicators
+        socket.on(SocketEvent.TYPING_START, ({ user }: { user: User }) => {
+            if (user.username !== currentUser.username) {
+                setTypingUsers(prev => 
+                    prev.includes(user.username) ? prev : [...prev, user.username]
+                )
+            }
+        })
+
+        socket.on(SocketEvent.TYPING_PAUSE, ({ user }: { user: User }) => {
+            if (user.username !== currentUser.username) {
+                setTypingUsers(prev => prev.filter(username => username !== user.username))
+            }
+        })
+
+        return () => {
+            socket.off(SocketEvent.TYPING_START)
+            socket.off(SocketEvent.TYPING_PAUSE)
         }
-        if (messagesContainerRef.current)
-            messagesContainerRef.current.scrollTop = lastScrollHeight
-    }, [isNewMessage, setIsNewMessage, lastScrollHeight])
+    }, [socket, currentUser.username])
+
+    useEffect(() => {
+        if (messagesContainerRef.current) {
+            if (isNewMessage) {
+                messagesContainerRef.current.scrollTop = messagesContainerRef.current.scrollHeight
+                setIsNewMessage(false)
+            } else {
+                messagesContainerRef.current.scrollTop = lastScrollHeight
+            }
+        }
+    }, [messages, isNewMessage, lastScrollHeight, setIsNewMessage])
+
+    const handleScroll = () => {
+        if (messagesContainerRef.current) {
+            setLastScrollHeight(messagesContainerRef.current.scrollTop)
+        }
+    }
 
     return (
         <div
-            className="flex-grow overflow-auto rounded-md bg-darkHover p-2"
+            className="flex-grow overflow-auto rounded-lg bg-dark/80 p-4 backdrop-blur-sm"
             ref={messagesContainerRef}
             onScroll={handleScroll}
         >
             {/* Chat messages */}
             {messages.map((message, index) => {
+                const isOwnMessage = message.username === currentUser.username
                 return (
                     <div
                         key={index}
-                        className={
-                            "mb-2 w-[80%] self-end break-words rounded-md bg-dark px-3 py-2" +
-                            (message.username === currentUser.username
-                                ? " ml-auto "
-                                : "")
-                        }
+                        className={`mb-4 flex ${isOwnMessage ? 'justify-end' : 'justify-start'}`}
                     >
-                        <div className="flex justify-between">
-                            <span className="text-xs text-primary">
-                                {message.username}
-                            </span>
-                            <span className="text-xs text-white">
-                                {message.timestamp}
-                            </span>
+                        <div className={`flex max-w-[80%] gap-2 ${isOwnMessage ? 'flex-row-reverse' : 'flex-row'}`}>
+                            {/* Avatar */}
+                            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-surface">
+                                <LuUser className="h-4 w-4 text-text-secondary" />
+                            </div>
+                            
+                            {/* Message Content */}
+                            <div className={`flex flex-col ${isOwnMessage ? 'items-end' : 'items-start'}`}>
+                                <div className="mb-1 flex items-center gap-2">
+                                    <span className="text-sm font-medium text-primary">
+                                        {message.username}
+                                    </span>
+                                    <span className="text-xs text-text-secondary">
+                                        {message.timestamp}
+                                    </span>
+                                </div>
+                                <div className={`rounded-2xl px-4 py-2.5 shadow-lg ${
+                                    isOwnMessage 
+                                        ? 'bg-primary/20 text-text' 
+                                        : 'bg-surface text-text'
+                                }`}>
+                                    <p className="leading-relaxed">{message.message}</p>
+                                </div>
+                            </div>
                         </div>
-                        <p className="py-1">{message.message}</p>
                     </div>
                 )
             })}
+            
+            {/* Typing indicators */}
+            {typingUsers.length > 0 && (
+                <div className="mb-4 flex items-center gap-2">
+                    <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-surface">
+                        <LuUser className="h-4 w-4 text-text-secondary" />
+                    </div>
+                    <div className="rounded-2xl bg-surface px-4 py-2.5">
+                        <p className="text-sm text-text-secondary italic">
+                            {typingUsers.length === 1
+                                ? `${typingUsers[0]} is typing...`
+                                : typingUsers.length === 2
+                                ? `${typingUsers[0]} and ${typingUsers[1]} are typing...`
+                                : `${typingUsers.length} people are typing...`}
+                        </p>
+                    </div>
+                </div>
+            )}
         </div>
     )
 }

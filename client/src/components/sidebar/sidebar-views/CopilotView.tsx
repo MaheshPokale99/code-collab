@@ -70,7 +70,7 @@ function CopilotView() {
         >
             <h1 className="view-title">Copilot</h1>
             <textarea
-                className="min-h-[120px] w-full rounded-md border-none bg-darkHover p-2 text-white outline-none"
+                className="min-h-[120px] w-full rounded-md border-none bg-darkHover p-2 text-black outline-none placeholder:text-gray-500 transition-all duration-200 hover:bg-opacity-90 focus:ring-2 focus:ring-primary/20 resize-y"
                 placeholder="What code do you want to generate?"
                 onChange={(e) => setInput(e.target.value)}
             />

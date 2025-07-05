@@ -69,17 +69,17 @@ function FileTab() {
 
     return (
         <div
-            className="flex h-[50px] w-full select-none gap-2 overflow-x-auto border-b border-border bg-surface/50 p-2 pb-0 backdrop-blur-sm"
+            className="flex h-[50px] w-full select-none gap-2 overflow-x-auto border-b border-zinc-800 bg-black p-2 pb-0"
             ref={fileTabRef}
         >
             {openFiles.map((file) => (
                 <span
                     key={file.id}
                     className={cn(
-                        "group flex w-fit cursor-pointer items-center rounded-t-md border-t border-x border-transparent px-3 py-2 text-text transition-all duration-200",
+                        "group flex w-fit cursor-pointer items-center rounded-t-md border-t border-x border-transparent px-3 py-2 text-white transition-all duration-200",
                         { 
-                            "border-t-primary bg-surface shadow-glow-sm": file.id === activeFile?.id,
-                            "hover:border-border-light hover:bg-surface/80": file.id !== activeFile?.id
+                            "border-t-purple-500 bg-zinc-900 shadow-glow-sm": file.id === activeFile?.id,
+                            "hover:border-zinc-700 hover:bg-zinc-900/50": file.id !== activeFile?.id
                         }
                     )}
                     onClick={() => changeActiveFile(file.id)}
@@ -87,7 +87,7 @@ function FileTab() {
                     <Icon
                         icon={getIconClassName(file.name)}
                         fontSize={20}
-                        className="mr-2 min-w-fit text-text-secondary group-hover:text-text"
+                        className="mr-2 min-w-fit text-zinc-400 group-hover:text-white"
                     />
                     <p
                         className="flex-grow cursor-pointer overflow-hidden truncate text-sm font-medium"
@@ -96,7 +96,7 @@ function FileTab() {
                         {file.name}
                     </p>
                     <IoClose
-                        className="ml-3 inline rounded-md p-1 text-text-secondary opacity-0 transition-all duration-200 hover:bg-surface-light hover:text-text group-hover:opacity-100"
+                        className="ml-3 inline rounded-md p-1 text-zinc-400 opacity-0 transition-all duration-200 hover:bg-zinc-800 hover:text-white group-hover:opacity-100"
                         size={18}
                         onClick={(e) => {
                             e.stopPropagation()

@@ -1,12 +1,16 @@
 import { useChatRoom } from "@/context/ChatContext"
 import { useViews } from "@/context/ViewContext"
-import { VIEWS } from "@/types/view"
+import { VIEWS, ViewType } from "./index"
 import { useState } from "react"
 import { Tooltip } from "react-tooltip"
-import { buttonStyles, tooltipStyles } from "../tooltipStyles"
+import { tooltipStyles } from "../tooltipStyles"
+import cn from "classnames"
+import { useAppContext } from "@/context/AppContext"
+import { ACTIVITY_STATE } from "@/types/app"
+import { motion } from "framer-motion"
 
 interface ViewButtonProps {
-    viewName: VIEWS
+    viewName: ViewType
     icon: JSX.Element
 }
 
@@ -15,8 +19,18 @@ const ViewButton = ({ viewName, icon }: ViewButtonProps) => {
         useViews()
     const { isNewMessage } = useChatRoom()
     const [showTooltip, setShowTooltip] = useState(true)
+    const { setActivityState } = useAppContext()
 
-    const handleViewClick = (viewName: VIEWS) => {
+    const handleViewClick = (viewName: ViewType) => {
+        if (viewName === "DRAWING") {
+            setActivityState(ACTIVITY_STATE.DRAWING)
+            return
+        }
+        
+        if (activeView === "DRAWING") {
+            setActivityState(ACTIVITY_STATE.CODING)
+        }
+
         if (viewName === activeView) {
             setIsSidebarOpen(!isSidebarOpen)
         } else {
@@ -25,29 +39,49 @@ const ViewButton = ({ viewName, icon }: ViewButtonProps) => {
         }
     }
 
+    const isActive = activeView === viewName || (viewName === "DRAWING" && activeView === "FILES")
+
     return (
         <div className="relative flex flex-col items-center">
-            <button
+            <motion.button
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
                 onClick={() => handleViewClick(viewName)}
-                onMouseEnter={() => setShowTooltip(true)} // Show tooltip again on hover
-                className={`${buttonStyles.base} ${buttonStyles.hover}`}
+                onMouseEnter={() => setShowTooltip(true)}
+                className={cn(
+                    "flex items-center justify-center rounded-lg p-2.5 transition-all duration-200 ease-in-out",
+                    {
+                        "bg-zinc-800 text-white shadow-lg ring-1 ring-zinc-700": isActive,
+                        "text-zinc-400 hover:bg-zinc-800/50 hover:text-white": !isActive,
+                    }
+                )}
                 {...(showTooltip && {
-                    "data-tooltip-id": `tooltip-${viewName}`,
-                    "data-tooltip-content": viewName,
+                    "data-tooltip-id": `tooltip-${String(viewName)}`,
+                    "data-tooltip-content": String(viewName),
                 })}
             >
-                <div className="flex items-center justify-center">{icon}</div>
+                <motion.div 
+                    className="flex items-center justify-center"
+                    animate={{ rotate: isActive ? 360 : 0 }}
+                    transition={{ duration: 0.3 }}
+                >
+                    {icon}
+                </motion.div>
                 {/* Show dot for new message in chat View Button */}
-                {viewName === VIEWS.CHATS && isNewMessage && (
-                    <div className="absolute right-0 top-0 h-3 w-3 rounded-full bg-primary"></div>
+                {viewName === "CHATS" && isNewMessage && (
+                    <motion.div 
+                        initial={{ scale: 0 }}
+                        animate={{ scale: 1 }}
+                        className="absolute -right-1 -top-1 h-2.5 w-2.5 rounded-full bg-purple-500 ring-2 ring-black"
+                    />
                 )}
-            </button>
+            </motion.button>
             {/* render the tooltip */}
             {showTooltip && (
                 <Tooltip
-                    id={`tooltip-${viewName}`}
+                    id={`tooltip-${String(viewName)}`}
                     place="right"
-                    offset={25}
+                    offset={15}
                     className="!z-50"
                     style={tooltipStyles}
                     noArrow={false}

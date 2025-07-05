@@ -1,4 +1,4 @@
-import  { useState } from "react"
+import { useState } from "react"
 import FileStructureView from "@/components/files/FileStructureView"
 import { useFileSystem } from "@/context/FileContext"
 import useResponsive from "@/hooks/useResponsive"
@@ -8,6 +8,7 @@ import { BiArchiveIn } from "react-icons/bi"
 import { TbFileUpload } from "react-icons/tb"
 import { v4 as uuidV4 } from "uuid"
 import { toast } from "react-hot-toast"
+import { RiFileAddLine, RiFolderAddLine, RiFolderUploadLine } from "react-icons/ri"
 
 function FilesView() {
     const { downloadFilesAndFolders, updateDirectory } = useFileSystem()
@@ -178,27 +179,29 @@ function FilesView() {
             className="flex select-none flex-col gap-1 px-4 py-2"
             style={{ height: viewHeight, maxHeight: viewHeight }}
         >
-            <FileStructureView />
-            <div
-                className={cn(`flex min-h-fit flex-col justify-end pt-2`, {
-                    hidden: minHeightReached,
-                })}
-            >
-                <hr />
-                <button
-                    className="mt-2 flex w-full justify-start rounded-md p-2 transition-all hover:bg-darkHover"
-                    onClick={handleOpenDirectory}
-                    disabled={isLoading}
-                >
-                    <TbFileUpload className="mr-2" size={24} />
-                    {isLoading ? "Loading..." : "Open File/Folder"}
-                </button>
-                <button
-                    className="flex w-full justify-start rounded-md p-2 transition-all hover:bg-darkHover"
-                    onClick={downloadFilesAndFolders}
-                >
-                    <BiArchiveIn className="mr-2" size={22} /> Download Code
-                </button>
+            <div className="flex h-full flex-col overflow-hidden">
+                <div className="flex items-center justify-between border-b border-white/10 bg-black/30 p-4">
+                    <h2 className="text-lg font-semibold text-white/80">Files</h2>
+                    <div className="flex gap-2">
+                        <button
+                            className="rounded-md p-2 text-white/60 transition-colors hover:bg-white/5 hover:text-white/80"
+                            onClick={handleOpenDirectory}
+                            title="Open Folder"
+                        >
+                            <TbFileUpload size={20} />
+                        </button>
+                        <button
+                            className="rounded-md p-2 text-white/60 transition-colors hover:bg-white/5 hover:text-white/80"
+                            onClick={downloadFilesAndFolders}
+                            title="Download Files"
+                        >
+                            <BiArchiveIn size={20} />
+                        </button>
+                    </div>
+                </div>
+                <div className="flex-1 overflow-hidden">
+                    <FileStructureView />
+                </div>
             </div>
         </div>
     )

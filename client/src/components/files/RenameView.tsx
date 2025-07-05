@@ -87,15 +87,15 @@ function RenameView({ id, preName, setEditing, type }: RenameViewProps) {
     }, [handleDocumentEvent, handleFormKeyDown, setEditing])
 
     return (
-        <div className="rounded-md">
+        <div className="flex-1">
             <form
                 onSubmit={handleSubmit}
                 ref={formRef}
-                className="flex w-full items-center gap-2 rounded-md"
+                className="flex w-full items-center"
             >
                 <input
                     type="text"
-                    className="w-full flex-grow rounded-sm bg-dark px-2 text-base text-white outline-none"
+                    className="w-full flex-grow bg-transparent text-sm text-white/80 outline-none ring-0 placeholder:text-white/40 focus:ring-0"
                     autoFocus
                     value={name}
                     onChange={(e) => setName(e.target.value)}

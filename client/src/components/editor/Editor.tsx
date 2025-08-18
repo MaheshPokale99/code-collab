@@ -7,7 +7,7 @@ import { SocketEvent } from "@/types/socket"
 import { color } from "@uiw/codemirror-extensions-color"
 import { hyperLink } from "@uiw/codemirror-extensions-hyper-link"
 import CodeMirror, { ViewUpdate, scrollPastEnd } from "@uiw/react-codemirror"
-import { useEffect, useMemo, useRef } from "react"
+import { useEffect, useRef } from "react"
 import { tokyoNight } from "@uiw/codemirror-themes-all"
 import { langs } from "@uiw/codemirror-extensions-langs"
 import { cursorTooltipBaseTheme, tooltipField } from "./tooltip"
@@ -21,11 +21,8 @@ function Editor() {
     const typingTimeoutRef = useRef<number | null>(null)
     const lastContentRef = useRef<string>("")
 
-    // Other users to show cursors for
-    const filteredUsers = useMemo(
-        () => users.filter((u) => u.username !== currentUser.username),
-        [users, currentUser],
-    )
+    // Other users to show cursors for (filter out self)
+    const getOtherUsers = () => users.filter(u => u.username !== currentUser.username)
 
     // Listen wheel event to zoom in/out and prevent page reload
     usePageEvents()
@@ -55,27 +52,31 @@ function Editor() {
     const handleChange = (value: string, viewUpdate?: ViewUpdate) => {
         if (!activeFile) return
 
+        // Update file content locally
         updateFileContent(activeFile.id, value)
 
+        // Only emit typing events if content actually changed
         if (value !== lastContentRef.current) {
+            // Emit cursor typing start with current position
             const cursorPosition = viewUpdate?.state.selection.main.head || 0
             socket.emit(SocketEvent.TYPING_START, { cursorPosition })
 
+            // Emit file updated with correct payload shape
             socket.emit(SocketEvent.FILE_UPDATED, {
                 fileId: activeFile.id,
                 newContent: value,
             })
 
+            // Update last content
             lastContentRef.current = value
 
+            // Debounce typing pause
             if (typingTimeoutRef.current) window.clearTimeout(typingTimeoutRef.current)
             typingTimeoutRef.current = window.setTimeout(() => {
                 socket.emit(SocketEvent.TYPING_PAUSE)
             }, 1000)
         }
     }
-
-
 
     const getLanguageExtension = () => {
         if (!language || !(language in langs)) return []
@@ -118,7 +119,7 @@ function Editor() {
                 extensions={[
                     hyperLink,
                     color,
-                    tooltipField(filteredUsers),
+                    tooltipField(getOtherUsers),
                     cursorTooltipBaseTheme,
                     scrollPastEnd(),
                     ...getLanguageExtension(),

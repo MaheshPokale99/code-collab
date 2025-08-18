@@ -1,8 +1,6 @@
 import { Socket } from "socket.io"
 
-type SocketId = string
-
-enum SocketEvent {
+export enum SocketEvent {
 	JOIN_REQUEST = "join-request",
 	JOIN_ACCEPTED = "join-accepted",
 	USER_JOINED = "user-joined",
@@ -26,10 +24,16 @@ enum SocketEvent {
 	REQUEST_DRAWING = "request-drawing",
 	SYNC_DRAWING = "sync-drawing",
 	DRAWING_UPDATE = "drawing-update",
+	// Video call events
+	VIDEO_CALL_START = "video-call-start",
+	VIDEO_CALL_END = "video-call-end",
+	VIDEO_OFFER = "video-offer",
+	VIDEO_ANSWER = "video-answer",
+	ICE_CANDIDATE = "ice-candidate",
 }
 
-interface SocketContext {
+export type SocketId = string
+
+export interface SocketContext {
 	socket: Socket
 }
-
-export { SocketEvent, SocketContext, SocketId }

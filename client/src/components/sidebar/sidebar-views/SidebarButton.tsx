@@ -22,12 +22,12 @@ const ViewButton = ({ viewName, icon }: ViewButtonProps) => {
     const { setActivityState } = useAppContext()
 
     const handleViewClick = (viewName: ViewType) => {
-        if (viewName === "DRAWING") {
+        if (viewName === ViewType.DRAWING) {
             setActivityState(ACTIVITY_STATE.DRAWING)
             return
         }
         
-        if (activeView === "DRAWING") {
+        if (activeView === ViewType.DRAWING) {
             setActivityState(ACTIVITY_STATE.CODING)
         }
 
@@ -39,7 +39,7 @@ const ViewButton = ({ viewName, icon }: ViewButtonProps) => {
         }
     }
 
-    const isActive = activeView === viewName || (viewName === "DRAWING" && activeView === "FILES")
+    const isActive = activeView === viewName || (viewName === ViewType.DRAWING && activeView === ViewType.FILES)
 
     return (
         <div className="relative flex flex-col items-center">
@@ -68,7 +68,7 @@ const ViewButton = ({ viewName, icon }: ViewButtonProps) => {
                     {icon}
                 </motion.div>
                 {/* Show dot for new message in chat View Button */}
-                {viewName === "CHATS" && isNewMessage && (
+                {viewName === ViewType.CHATS && isNewMessage && (
                     <motion.div 
                         initial={{ scale: 0 }}
                         animate={{ scale: 1 }}

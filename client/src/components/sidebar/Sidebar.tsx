@@ -1,5 +1,5 @@
 import { useViews } from "@/context/ViewContext"
-import { viewComponents, viewIcons } from "./sidebar-views/index"
+import { VIEWS, viewComponents, ViewType } from "./sidebar-views/index"
 import SidebarButton from "./sidebar-views/SidebarButton"
 import cn from "classnames"
 import useResponsive from "@/hooks/useResponsive"
@@ -8,6 +8,8 @@ import { motion, AnimatePresence } from "framer-motion"
 function Sidebar() {
     const { activeView, isSidebarOpen } = useViews()
     const { minHeightReached } = useResponsive()
+
+    const ActiveComponent = viewComponents[activeView as ViewType]
 
     return (
         <aside className="flex h-full">
@@ -24,40 +26,22 @@ function Sidebar() {
                 )}
             >
                 <div className="flex flex-1 items-center justify-around gap-4 md:flex-col md:justify-start">
-                    <SidebarButton
-                        viewName="FILES"
-                        icon={viewIcons.FILES}
-                    />
-                    <SidebarButton
-                        viewName="CHATS"
-                        icon={viewIcons.CHATS}
-                    />
-                    <SidebarButton
-                        viewName="COPILOT"
-                        icon={viewIcons.COPILOT}
-                    />
-                    <SidebarButton
-                        viewName="RUN"
-                        icon={viewIcons.RUN}
-                    />
-                    <SidebarButton
-                        viewName="CLIENTS"
-                        icon={viewIcons.CLIENTS}
-                    />
-                    <SidebarButton
-                        viewName="DRAWING"
-                        icon={viewIcons.DRAWING}
-                    />
-                    <SidebarButton
-                        viewName="SETTINGS"
-                        icon={viewIcons.SETTINGS}
-                    />
+                    {VIEWS.map((view) => {
+                        const IconComponent = view.icon
+                        return (
+                            <SidebarButton
+                                key={view.id}
+                                viewName={view.id}
+                                icon={<IconComponent size={24} />}
+                            />
+                        )
+                    })}
                 </div>
             </motion.div>
 
             {/* View Content */}
             <AnimatePresence>
-                {isSidebarOpen && (
+                {isSidebarOpen && ActiveComponent && (
                     <motion.div
                         initial={{ opacity: 0, x: -20 }}
                         animate={{ opacity: 1, x: 0 }}
@@ -65,7 +49,7 @@ function Sidebar() {
                         transition={{ duration: 0.2 }}
                         className="absolute left-0 top-0 z-20 h-full w-full flex-col border-r border-zinc-800 bg-black/90 backdrop-blur-xl md:static md:min-w-[320px]"
                     >
-                        {viewComponents[activeView]}
+                        <ActiveComponent />
                     </motion.div>
                 )}
             </AnimatePresence>

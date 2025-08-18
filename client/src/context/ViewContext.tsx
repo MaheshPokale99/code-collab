@@ -11,7 +11,7 @@ interface ViewContextType {
 const ViewContext = createContext<ViewContextType | undefined>(undefined)
 
 export function ViewContextProvider({ children }: { children: ReactNode }) {
-    const [activeView, setActiveView] = useState<ViewType>("FILES")
+    const [activeView, setActiveView] = useState<ViewType>(ViewType.FILES)
     const [isSidebarOpen, setIsSidebarOpen] = useState<boolean>(true)
 
     return (

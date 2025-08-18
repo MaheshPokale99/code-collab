@@ -258,6 +258,44 @@ io.on("connection", (socket) => {
 			snapshot,
 		})
 	})
+
+	// Handle video call events
+	socket.on(SocketEvent.VIDEO_CALL_START, ({ roomId, from }) => {
+		const user = getUserBySocketId(socket.id)
+		if (!user) return
+		
+		// Broadcast to all users in the room except the sender
+		socket.broadcast.to(roomId).emit(SocketEvent.VIDEO_CALL_START, {
+			from: user.username,
+			peerId: socket.id
+		})
+	})
+
+	socket.on(SocketEvent.VIDEO_CALL_END, ({ roomId, from }) => {
+		const user = getUserBySocketId(socket.id)
+		if (!user) return
+		
+		// Broadcast to all users in the room
+		socket.broadcast.to(roomId).emit(SocketEvent.VIDEO_CALL_END, {
+			from: user.username
+		})
+	})
+
+	socket.on(SocketEvent.VIDEO_ANSWER, ({ answer, to }) => {
+		// Forward the answer to the specific peer
+		io.to(to).emit(SocketEvent.VIDEO_ANSWER, {
+			from: socket.id,
+			answer
+		})
+	})
+
+	socket.on(SocketEvent.ICE_CANDIDATE, ({ candidate, to }) => {
+		// Forward ICE candidate to the specific peer
+		io.to(to).emit(SocketEvent.ICE_CANDIDATE, {
+			from: socket.id,
+			candidate
+		})
+	})
 })
 
 const PORT = process.env.PORT || 3000

@@ -1,48 +1,83 @@
 
 import { BsChatSquareText } from "react-icons/bs"
-import { FaRegUser } from "react-icons/fa"
-import { FiSettings } from "react-icons/fi"
-import { HiOutlineCode } from "react-icons/hi"
-import { VscFiles } from "react-icons/vsc"
-import { IoPlayOutline } from "react-icons/io5"
-import { TbPaint } from "react-icons/tb"
+import { LuCode2, LuFileText, LuSettings, LuUsers, LuPalette, LuPlay, LuPhone } from "react-icons/lu"
 import ChatsView from "./ChatsView"
 import CopilotView from "./CopilotView"
+import DrawingView from "./DrawingView"
 import FilesView from "./FilesView"
 import RunView from "./RunView"
 import SettingsView from "./SettingsView"
 import UsersView from "./UsersView"
+import VideoCallView from "./VideoCallView"
 
-export const VIEWS = {
-    FILES: "FILES",
-    CHATS: "CHATS",
-    COPILOT: "COPILOT",
-    RUN: "RUN",
-    CLIENTS: "CLIENTS",
-    SETTINGS: "SETTINGS",
-    DRAWING: "DRAWING",
-} as const
-
-export type ViewType = keyof typeof VIEWS
-
-type ViewRecord = Record<ViewType, JSX.Element>
-
-export const viewIcons: ViewRecord = {
-    FILES: <VscFiles size={24} />,
-    CHATS: <BsChatSquareText size={22} />,
-    COPILOT: <HiOutlineCode size={24} />,
-    RUN: <IoPlayOutline size={24} />,
-    CLIENTS: <FaRegUser size={22} />,
-    SETTINGS: <FiSettings size={24} />,
-    DRAWING: <TbPaint size={24} />,
+export enum ViewType {
+    FILES = "files",
+    CHATS = "chats",
+    USERS = "users",
+    SETTINGS = "settings",
+    DRAWING = "drawing",
+    RUN = "run",
+    COPILOT = "copilot",
+    VIDEO_CALL = "video-call",
 }
 
-export const viewComponents: ViewRecord = {
-    FILES: <FilesView />,
-    CHATS: <ChatsView />,
-    COPILOT: <CopilotView />,
-    RUN: <RunView />,
-    CLIENTS: <UsersView />,
-    SETTINGS: <SettingsView />,
-    DRAWING: <FilesView />,
-} 
+export const VIEWS = [
+    {
+        id: ViewType.FILES,
+        name: "Files",
+        icon: LuFileText,
+        component: FilesView,
+    },
+    {
+        id: ViewType.CHATS,
+        name: "Chat",
+        icon: BsChatSquareText,
+        component: ChatsView,
+    },
+    {
+        id: ViewType.USERS,
+        name: "Users",
+        icon: LuUsers,
+        component: UsersView,
+    },
+    {
+        id: ViewType.VIDEO_CALL,
+        name: "Video Call",
+        icon: LuPhone,
+        component: VideoCallView,
+    },
+    {
+        id: ViewType.DRAWING,
+        name: "Drawing",
+        icon: LuPalette,
+        component: DrawingView,
+    },
+    {
+        id: ViewType.RUN,
+        name: "Run",
+        icon: LuPlay,
+        component: RunView,
+    },
+    {
+        id: ViewType.COPILOT,
+        name: "Copilot",
+        icon: LuCode2,
+        component: CopilotView,
+    },
+    {
+        id: ViewType.SETTINGS,
+        name: "Settings",
+        icon: LuSettings,
+        component: SettingsView,
+    },
+]
+
+export const viewComponents = VIEWS.reduce((acc, view) => {
+    acc[view.id] = view.component
+    return acc
+}, {} as Record<ViewType, React.ComponentType>)
+
+export const viewIcons = VIEWS.reduce((acc, view) => {
+    acc[view.id] = view.icon
+    return acc
+}, {} as Record<ViewType, React.ComponentType>) 

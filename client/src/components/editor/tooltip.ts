@@ -2,43 +2,40 @@ import { RemoteUser } from "@/types/user"
 import { StateField } from "@codemirror/state"
 import { EditorView, showTooltip } from "@codemirror/view"
 
-export function tooltipField(users: RemoteUser[]) {
+export function tooltipField(getUsers: () => RemoteUser[]) {
     return StateField.define({
-        create: () => getCursorTooltips(users),
-        update(tooltips, tr) {
-            if (!tr.docChanged && !tr.selection) return tooltips
-            return getCursorTooltips(users)
+        create: () => getCursorTooltips(getUsers()),
+        update(_tooltips, _tr) {
+            return getCursorTooltips(getUsers())
         },
         provide: (f) => showTooltip.computeN([f], (state) => state.field(f)),
     })
 }
 
 export function getCursorTooltips(users: RemoteUser[]) {
-    return users.map((user) => {
-        if (!user.typing) {
-            return null
-        }
-        
-        const pos = user.cursorPosition || 0
-
-        return {
-            pos,
-            above: true,
-            strictSide: true,
-            arrow: true,
-            create: () => {
-                const dom = document.createElement("div")
-                dom.className = "cm-tooltip-cursor"
-                dom.innerHTML = `
-                    <div class="cursor-user-info">
-                        <span class="cursor-username">${user.username}</span>
-                        <span class="cursor-typing-indicator">typing...</span>
-                    </div>
-                `
-                return { dom }
-            },
-        }
-    }).filter(Boolean)
+    return users
+        .map((user) => {
+            if (!user.typing) return null
+            const pos = user.cursorPosition || 0
+            return {
+                pos,
+                above: true,
+                strictSide: true,
+                arrow: true,
+                create: () => {
+                    const dom = document.createElement("div")
+                    dom.className = "cm-tooltip-cursor"
+                    dom.innerHTML = `
+                        <div class="cursor-user-info">
+                            <span class="cursor-username">${user.username}</span>
+                            <span class="cursor-typing-indicator">typing...</span>
+                        </div>
+                    `
+                    return { dom }
+                },
+            }
+        })
+        .filter(Boolean)
 }
 
 export const cursorTooltipBaseTheme = EditorView.baseTheme({
@@ -51,7 +48,8 @@ export const cursorTooltipBaseTheme = EditorView.baseTheme({
         zIndex: "1000",
         fontSize: "12px",
         fontWeight: "500",
-        boxShadow: "0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)",
+        boxShadow:
+            "0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)",
         "& .cm-tooltip-arrow:before": {
             borderTopColor: "#3b82f6",
         },

@@ -1,4 +1,4 @@
-import React from "react"
+
 import { BsChatSquareText } from "react-icons/bs"
 import { FaRegUser } from "react-icons/fa"
 import { FiSettings } from "react-icons/fi"

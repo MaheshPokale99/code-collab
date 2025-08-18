@@ -1,4 +1,4 @@
-import { VIEWS, ViewType } from "@/components/sidebar/sidebar-views"
+import { ViewType } from "@/components/sidebar/sidebar-views"
 import { ReactNode, createContext, useContext, useState } from "react"
 
 interface ViewContextType {

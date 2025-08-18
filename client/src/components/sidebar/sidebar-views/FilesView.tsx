@@ -1,26 +1,20 @@
-import { useState } from "react"
+
 import FileStructureView from "@/components/files/FileStructureView"
 import { useFileSystem } from "@/context/FileContext"
 import useResponsive from "@/hooks/useResponsive"
 import { FileSystemItem } from "@/types/file"
-import cn from "classnames"
 import { BiArchiveIn } from "react-icons/bi"
 import { TbFileUpload } from "react-icons/tb"
 import { v4 as uuidV4 } from "uuid"
 import { toast } from "react-hot-toast"
-import { RiFileAddLine, RiFolderAddLine, RiFolderUploadLine } from "react-icons/ri"
 
 function FilesView() {
     const { downloadFilesAndFolders, updateDirectory } = useFileSystem()
     const { viewHeight } = useResponsive()
-    const { minHeightReached } = useResponsive()
-    const [isLoading, setIsLoading] = useState(false)
+
 
     const handleOpenDirectory = async () => {
         try {
-            setIsLoading(true)
-
-            // Check for modern API support
             if ("showDirectoryPicker" in window) {
                 const directoryHandle = await window.showDirectoryPicker()
                 await processDirectoryHandle(directoryHandle)
@@ -45,13 +39,10 @@ function FilesView() {
                 return
             }
 
-            // Notify if neither API is supported
             toast.error("Your browser does not support directory selection.")
         } catch (error) {
             console.error("Error opening directory:", error)
             toast.error("Failed to open directory")
-        } finally {
-            setIsLoading(false)
         }
     }
 

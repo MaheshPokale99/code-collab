@@ -1,5 +1,5 @@
 import { useViews } from "@/context/ViewContext"
-import { VIEWS, ViewType, viewComponents, viewIcons } from "./sidebar-views/index"
+import { viewComponents, viewIcons } from "./sidebar-views/index"
 import SidebarButton from "./sidebar-views/SidebarButton"
 import cn from "classnames"
 import useResponsive from "@/hooks/useResponsive"

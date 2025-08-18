@@ -3,7 +3,7 @@ import { useChatRoom } from "@/context/ChatContext"
 import { useSocket } from "@/context/SocketContext"
 import { SocketEvent } from "@/types/socket"
 import { User } from "@/types/user"
-import { SyntheticEvent, useEffect, useRef, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import { LuUser } from "react-icons/lu"
 
 function ChatList() {

@@ -23,7 +23,7 @@ function EditorPage() {
     const { socket } = useSocket()
     const location = useLocation()
     const hasJoinedRef = useRef(false)
-    const joinTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+
 
     useEffect(() => {
         // If we don't have a roomId in the URL, redirect to home

@@ -1,6 +1,6 @@
 import { useChatRoom } from "@/context/ChatContext"
 import { useViews } from "@/context/ViewContext"
-import { VIEWS, ViewType } from "./index"
+import { ViewType } from "./index"
 import { useState } from "react"
 import { Tooltip } from "react-tooltip"
 import { tooltipStyles } from "../tooltipStyles"

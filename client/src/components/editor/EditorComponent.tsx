@@ -1,13 +1,9 @@
-import { useAppContext } from "@/context/AppContext"
 import { useFileSystem } from "@/context/FileContext"
-import { useSocket } from "@/context/SocketContext"
 import Editor from "./Editor"
 import FileTab from "./FileTab"
 
 function EditorComponent() {
-    const { socket } = useSocket()
     const { activeFile } = useFileSystem()
-    const { currentUser } = useAppContext()
 
     return (
         <div className="flex h-full w-full flex-col">

@@ -2,12 +2,42 @@ import express, { Response, Request } from "express"
 import dotenv from "dotenv"
 import http from "http"
 import cors from "cors"
-import { SocketEvent, SocketId } from "./types/socket"
-import { USER_CONNECTION_STATUS, User } from "./types/user"
-import { Server } from "socket.io"
+import { SocketEvent } from "./types/socket"
+import { USER_CONNECTION_STATUS } from "./types/user"
+import { Server, Socket } from "socket.io"
 import path from "path"
+import {
+	closeSocketCluster,
+	getReservationRefreshIntervalMs,
+	getSocketUser,
+	getUsersInRoom,
+	refreshUsernameReservation,
+	releaseUsernameReservation,
+	reserveUsername,
+	setSocketUser,
+	setupSocketCluster,
+	type SocketClusterState,
+} from "./socketCluster"
 
 dotenv.config()
+
+function getSocketTransports(): Array<"polling" | "websocket"> | undefined {
+	const configuredTransports = process.env.SOCKET_IO_TRANSPORTS
+
+	if (!configuredTransports) {
+		return undefined
+	}
+
+	const transports = configuredTransports
+		.split(",")
+		.map((transport) => transport.trim())
+		.filter(
+			(transport): transport is "polling" | "websocket" =>
+				transport === "polling" || transport === "websocket"
+		)
+
+	return transports.length > 0 ? transports : undefined
+}
 
 const app = express()
 
@@ -24,279 +54,339 @@ const io = new Server(server, {
 	},
 	maxHttpBufferSize: 1e8,
 	pingTimeout: 60000,
+	transports: getSocketTransports(),
 })
 
-let userSocketMap: User[] = []
+const reservationRefreshIntervals = new Map<string, NodeJS.Timeout>()
 
-// Function to get all users in a room
-function getUsersInRoom(roomId: string): User[] {
-	return userSocketMap.filter((user) => user.roomId == roomId)
-}
+function stopUsernameReservationRefresh(socketId: string): void {
+	const refreshInterval = reservationRefreshIntervals.get(socketId)
 
-// Function to get room id by socket id
-function getRoomId(socketId: SocketId): string | null {
-	const roomId = userSocketMap.find(
-		(user) => user.socketId === socketId
-	)?.roomId
-
-	if (!roomId) {
-		console.error("Room ID is undefined for socket ID:", socketId)
-		return null
+	if (!refreshInterval) {
+		return
 	}
-	return roomId
+
+	clearInterval(refreshInterval)
+	reservationRefreshIntervals.delete(socketId)
 }
 
-function getUserBySocketId(socketId: SocketId): User | null {
-	const user = userSocketMap.find((user) => user.socketId === socketId)
-	if (!user) {
-		console.error("User not found for socket ID:", socketId)
-		return null
+function startUsernameReservationRefresh(
+	socketId: string,
+	clusterState: SocketClusterState,
+	getUser: () => ReturnType<typeof getSocketUser>
+): void {
+	stopUsernameReservationRefresh(socketId)
+
+	if (!clusterState.pubClient) {
+		return
 	}
-	return user
-}
 
-io.on("connection", (socket) => {
-	// Handle user actions
-	socket.on(SocketEvent.JOIN_REQUEST, ({ roomId, username }) => {
-		// Check is username exist in the room
-		const isUsernameExist = getUsersInRoom(roomId).filter(
-			(u) => u.username === username
-		)
-		if (isUsernameExist.length > 0) {
-			io.to(socket.id).emit(SocketEvent.USERNAME_EXISTS)
+	const refreshIntervalMs = getReservationRefreshIntervalMs(clusterState)
+	const refreshInterval = setInterval(() => {
+		const user = getUser()
+
+		if (!user) {
+			stopUsernameReservationRefresh(socketId)
 			return
 		}
 
-		const user = {
-			username,
-			roomId,
-			status: USER_CONNECTION_STATUS.ONLINE,
-			cursorPosition: 0,
-			typing: false,
-			socketId: socket.id,
-			currentFile: null,
-		}
-		userSocketMap.push(user)
-		socket.join(roomId)
-		socket.broadcast.to(roomId).emit(SocketEvent.USER_JOINED, { user })
-		const users = getUsersInRoom(roomId)
-		io.to(socket.id).emit(SocketEvent.JOIN_ACCEPTED, { user, users })
-	})
+		void refreshUsernameReservation(clusterState, user).catch((error) => {
+			console.error("Failed to refresh username reservation:", error)
+		})
+	}, refreshIntervalMs)
 
-	socket.on("disconnecting", () => {
-		const user = getUserBySocketId(socket.id)
-		if (!user) return
-		const roomId = user.roomId
-		socket.broadcast
-			.to(roomId)
-			.emit(SocketEvent.USER_DISCONNECTED, { user })
-		userSocketMap = userSocketMap.filter((u) => u.socketId !== socket.id)
-		socket.leave(roomId)
-	})
+	refreshInterval.unref()
+	reservationRefreshIntervals.set(socketId, refreshInterval)
+}
+
+function getSocketRoomId(socket: Socket): string | null {
+	const user = getSocketUser(socket)
+
+	if (!user) {
+		console.error("User not found for socket ID:", socket.id)
+		return null
+	}
+
+	return user.roomId
+}
+
+function registerSocketHandlers(clusterState: SocketClusterState): void {
+	io.on("connection", (socket) => {
+		const getCurrentUser = () => getSocketUser(socket)
+
+	// Handle user actions
+		socket.on(SocketEvent.JOIN_REQUEST, async ({ roomId, username }) => {
+			const reserved = await reserveUsername(
+				io,
+				clusterState,
+				roomId,
+				username,
+				socket.id
+			)
+
+			if (!reserved) {
+				io.to(socket.id).emit(SocketEvent.USERNAME_EXISTS)
+				return
+			}
+
+			const user = {
+				username: username.trim(),
+				roomId,
+				status: USER_CONNECTION_STATUS.ONLINE,
+				cursorPosition: 0,
+				typing: false,
+				socketId: socket.id,
+				currentFile: null,
+			}
+
+			try {
+				setSocketUser(socket, user)
+				startUsernameReservationRefresh(socket.id, clusterState, getCurrentUser)
+				socket.join(roomId)
+
+				const users = await getUsersInRoom(io, roomId)
+
+				socket.broadcast.to(roomId).emit(SocketEvent.USER_JOINED, { user })
+				io.to(socket.id).emit(SocketEvent.JOIN_ACCEPTED, { user, users })
+			} catch (error) {
+				stopUsernameReservationRefresh(socket.id)
+				setSocketUser(socket, null)
+				await releaseUsernameReservation(clusterState, user)
+				console.error("Failed to join room:", error)
+				socket.emit("error", "Failed to join the room.")
+			}
+		})
+
+		socket.on("disconnecting", () => {
+			const user = getCurrentUser()
+
+			if (!user) {
+				return
+			}
+
+			socket.broadcast
+				.to(user.roomId)
+				.emit(SocketEvent.USER_DISCONNECTED, { user })
+
+			stopUsernameReservationRefresh(socket.id)
+			void releaseUsernameReservation(clusterState, user).catch((error) => {
+				console.error("Failed to release username reservation:", error)
+			})
+			setSocketUser(socket, null)
+		})
+
+		socket.on("disconnect", () => {
+			stopUsernameReservationRefresh(socket.id)
+		})
 
 	// Handle file actions
-	socket.on(
-		SocketEvent.SYNC_FILE_STRUCTURE,
-		({ fileStructure, openFiles, activeFile, socketId }) => {
-			io.to(socketId).emit(SocketEvent.SYNC_FILE_STRUCTURE, {
-				fileStructure,
-				openFiles,
-				activeFile,
-			})
-		}
-	)
+		socket.on(
+			SocketEvent.SYNC_FILE_STRUCTURE,
+			({ fileStructure, openFiles, activeFile, socketId }) => {
+				io.to(socketId).emit(SocketEvent.SYNC_FILE_STRUCTURE, {
+					fileStructure,
+					openFiles,
+					activeFile,
+				})
+			}
+		)
 
-	socket.on(
-		SocketEvent.DIRECTORY_CREATED,
-		({ parentDirId, newDirectory }) => {
-			const roomId = getRoomId(socket.id)
+		socket.on(
+			SocketEvent.DIRECTORY_CREATED,
+			({ parentDirId, newDirectory }) => {
+				const roomId = getSocketRoomId(socket)
+				if (!roomId) return
+				socket.broadcast.to(roomId).emit(SocketEvent.DIRECTORY_CREATED, {
+					parentDirId,
+					newDirectory,
+				})
+			}
+		)
+
+		socket.on(SocketEvent.DIRECTORY_UPDATED, ({ dirId, children }) => {
+			const roomId = getSocketRoomId(socket)
 			if (!roomId) return
-			socket.broadcast.to(roomId).emit(SocketEvent.DIRECTORY_CREATED, {
-				parentDirId,
-				newDirectory,
+			socket.broadcast.to(roomId).emit(SocketEvent.DIRECTORY_UPDATED, {
+				dirId,
+				children,
 			})
-		}
-	)
-
-	socket.on(SocketEvent.DIRECTORY_UPDATED, ({ dirId, children }) => {
-		const roomId = getRoomId(socket.id)
-		if (!roomId) return
-		socket.broadcast.to(roomId).emit(SocketEvent.DIRECTORY_UPDATED, {
-			dirId,
-			children,
 		})
-	})
 
-	socket.on(SocketEvent.DIRECTORY_RENAMED, ({ dirId, newName }) => {
-		const roomId = getRoomId(socket.id)
-		if (!roomId) return
-		socket.broadcast.to(roomId).emit(SocketEvent.DIRECTORY_RENAMED, {
-			dirId,
-			newName,
+		socket.on(SocketEvent.DIRECTORY_RENAMED, ({ dirId, newName }) => {
+			const roomId = getSocketRoomId(socket)
+			if (!roomId) return
+			socket.broadcast.to(roomId).emit(SocketEvent.DIRECTORY_RENAMED, {
+				dirId,
+				newName,
+			})
 		})
-	})
 
-	socket.on(SocketEvent.DIRECTORY_DELETED, ({ dirId }) => {
-		const roomId = getRoomId(socket.id)
-		if (!roomId) return
-		socket.broadcast
-			.to(roomId)
-			.emit(SocketEvent.DIRECTORY_DELETED, { dirId })
-	})
-
-	socket.on(SocketEvent.FILE_CREATED, ({ parentDirId, newFile }) => {
-		const roomId = getRoomId(socket.id)
-		if (!roomId) return
-		socket.broadcast
-			.to(roomId)
-			.emit(SocketEvent.FILE_CREATED, { parentDirId, newFile })
-	})
-
-	socket.on(SocketEvent.FILE_UPDATED, ({ fileId, newContent }) => {
-		const roomId = getRoomId(socket.id)
-		if (!roomId) return
-		socket.broadcast.to(roomId).emit(SocketEvent.FILE_UPDATED, {
-			fileId,
-			newContent,
+		socket.on(SocketEvent.DIRECTORY_DELETED, ({ dirId }) => {
+			const roomId = getSocketRoomId(socket)
+			if (!roomId) return
+			socket.broadcast
+				.to(roomId)
+				.emit(SocketEvent.DIRECTORY_DELETED, { dirId })
 		})
-	})
 
-	socket.on(SocketEvent.FILE_RENAMED, ({ fileId, newName }) => {
-		const roomId = getRoomId(socket.id)
-		if (!roomId) return
-		socket.broadcast.to(roomId).emit(SocketEvent.FILE_RENAMED, {
-			fileId,
-			newName,
+		socket.on(SocketEvent.FILE_CREATED, ({ parentDirId, newFile }) => {
+			const roomId = getSocketRoomId(socket)
+			if (!roomId) return
+			socket.broadcast
+				.to(roomId)
+				.emit(SocketEvent.FILE_CREATED, { parentDirId, newFile })
 		})
-	})
 
-	socket.on(SocketEvent.FILE_DELETED, ({ fileId }) => {
-		const roomId = getRoomId(socket.id)
-		if (!roomId) return
-		socket.broadcast.to(roomId).emit(SocketEvent.FILE_DELETED, { fileId })
-	})
+		socket.on(SocketEvent.FILE_UPDATED, ({ fileId, newContent }) => {
+			const roomId = getSocketRoomId(socket)
+			if (!roomId) return
+			socket.broadcast.to(roomId).emit(SocketEvent.FILE_UPDATED, {
+				fileId,
+				newContent,
+			})
+		})
+
+		socket.on(SocketEvent.FILE_RENAMED, ({ fileId, newName }) => {
+			const roomId = getSocketRoomId(socket)
+			if (!roomId) return
+			socket.broadcast.to(roomId).emit(SocketEvent.FILE_RENAMED, {
+				fileId,
+				newName,
+			})
+		})
+
+		socket.on(SocketEvent.FILE_DELETED, ({ fileId }) => {
+			const roomId = getSocketRoomId(socket)
+			if (!roomId) return
+			socket.broadcast.to(roomId).emit(SocketEvent.FILE_DELETED, { fileId })
+		})
 
 	// Handle user status
-	socket.on(SocketEvent.USER_OFFLINE, ({ socketId }) => {
-		userSocketMap = userSocketMap.map((user) => {
-			if (user.socketId === socketId) {
-				return { ...user, status: USER_CONNECTION_STATUS.OFFLINE }
-			}
-			return user
-		})
-		const roomId = getRoomId(socketId)
-		if (!roomId) return
-		socket.broadcast.to(roomId).emit(SocketEvent.USER_OFFLINE, { socketId })
-	})
+		socket.on(SocketEvent.USER_OFFLINE, () => {
+			const user = getCurrentUser()
 
-	socket.on(SocketEvent.USER_ONLINE, ({ socketId }) => {
-		userSocketMap = userSocketMap.map((user) => {
-			if (user.socketId === socketId) {
-				return { ...user, status: USER_CONNECTION_STATUS.ONLINE }
-			}
-			return user
+			if (!user) return
+
+			setSocketUser(socket, {
+				...user,
+				status: USER_CONNECTION_STATUS.OFFLINE,
+			})
+
+			socket.broadcast
+				.to(user.roomId)
+				.emit(SocketEvent.USER_OFFLINE, { socketId: socket.id })
 		})
-		const roomId = getRoomId(socketId)
-		if (!roomId) return
-		socket.broadcast.to(roomId).emit(SocketEvent.USER_ONLINE, { socketId })
-	})
+
+		socket.on(SocketEvent.USER_ONLINE, () => {
+			const user = getCurrentUser()
+
+			if (!user) return
+
+			setSocketUser(socket, {
+				...user,
+				status: USER_CONNECTION_STATUS.ONLINE,
+			})
+
+			socket.broadcast
+				.to(user.roomId)
+				.emit(SocketEvent.USER_ONLINE, { socketId: socket.id })
+		})
 
 	// Handle chat actions
-	socket.on(SocketEvent.SEND_MESSAGE, ({ message }) => {
-		const roomId = getRoomId(socket.id)
-		if (!roomId) return
-		socket.broadcast
-			.to(roomId)
-			.emit(SocketEvent.RECEIVE_MESSAGE, { message })
-	})
+		socket.on(SocketEvent.SEND_MESSAGE, ({ message }) => {
+			const roomId = getSocketRoomId(socket)
+			if (!roomId) return
+			socket.broadcast
+				.to(roomId)
+				.emit(SocketEvent.RECEIVE_MESSAGE, { message })
+		})
 
 	// Handle cursor position
-	socket.on(SocketEvent.TYPING_START, ({ cursorPosition }) => {
-		userSocketMap = userSocketMap.map((user) => {
-			if (user.socketId === socket.id) {
-				return { ...user, typing: true, cursorPosition }
-			}
-			return user
+		socket.on(SocketEvent.TYPING_START, ({ cursorPosition }) => {
+			const user = getCurrentUser()
+
+			if (!user) return
+
+			const updatedUser = { ...user, typing: true, cursorPosition }
+			setSocketUser(socket, updatedUser)
+			socket.broadcast
+				.to(updatedUser.roomId)
+				.emit(SocketEvent.TYPING_START, { user: updatedUser })
 		})
-		const user = getUserBySocketId(socket.id)
-		if (!user) return
-		const roomId = user.roomId
-		socket.broadcast.to(roomId).emit(SocketEvent.TYPING_START, { user })
-	})
 
-	socket.on(SocketEvent.TYPING_PAUSE, () => {
-		userSocketMap = userSocketMap.map((user) => {
-			if (user.socketId === socket.id) {
-				return { ...user, typing: false }
-			}
-			return user
+		socket.on(SocketEvent.TYPING_PAUSE, () => {
+			const user = getCurrentUser()
+
+			if (!user) return
+
+			const updatedUser = { ...user, typing: false }
+			setSocketUser(socket, updatedUser)
+			socket.broadcast
+				.to(updatedUser.roomId)
+				.emit(SocketEvent.TYPING_PAUSE, { user: updatedUser })
 		})
-		const user = getUserBySocketId(socket.id)
-		if (!user) return
-		const roomId = user.roomId
-		socket.broadcast.to(roomId).emit(SocketEvent.TYPING_PAUSE, { user })
-	})
 
-	socket.on(SocketEvent.REQUEST_DRAWING, () => {
-		const roomId = getRoomId(socket.id)
-		if (!roomId) return
-		socket.broadcast
-			.to(roomId)
-			.emit(SocketEvent.REQUEST_DRAWING, { socketId: socket.id })
-	})
-
-	socket.on(SocketEvent.SYNC_DRAWING, ({ drawingData, socketId }) => {
-		socket.broadcast
-			.to(socketId)
-			.emit(SocketEvent.SYNC_DRAWING, { drawingData })
-	})
-
-	socket.on(SocketEvent.DRAWING_UPDATE, ({ snapshot }) => {
-		const roomId = getRoomId(socket.id)
-		if (!roomId) return
-		socket.broadcast.to(roomId).emit(SocketEvent.DRAWING_UPDATE, {
-			snapshot,
+		socket.on(SocketEvent.REQUEST_DRAWING, () => {
+			const roomId = getSocketRoomId(socket)
+			if (!roomId) return
+			socket.broadcast
+				.to(roomId)
+				.emit(SocketEvent.REQUEST_DRAWING, { socketId: socket.id })
 		})
-	})
+
+		socket.on(SocketEvent.SYNC_DRAWING, ({ drawingData, socketId }) => {
+			socket.broadcast
+				.to(socketId)
+				.emit(SocketEvent.SYNC_DRAWING, { drawingData })
+		})
+
+		socket.on(SocketEvent.DRAWING_UPDATE, ({ snapshot }) => {
+			const roomId = getSocketRoomId(socket)
+			if (!roomId) return
+			socket.broadcast.to(roomId).emit(SocketEvent.DRAWING_UPDATE, {
+				snapshot,
+			})
+		})
 
 	// Handle video call events
-	socket.on(SocketEvent.VIDEO_CALL_START, ({ roomId, from }) => {
-		const user = getUserBySocketId(socket.id)
-		if (!user) return
-		
-		// Broadcast to all users in the room except the sender
-		socket.broadcast.to(roomId).emit(SocketEvent.VIDEO_CALL_START, {
-			from: user.username,
-			peerId: socket.id
-		})
-	})
+		socket.on(SocketEvent.VIDEO_CALL_START, () => {
+			const user = getCurrentUser()
+			if (!user) return
 
-	socket.on(SocketEvent.VIDEO_CALL_END, ({ roomId, from }) => {
-		const user = getUserBySocketId(socket.id)
-		if (!user) return
-		
-		// Broadcast to all users in the room
-		socket.broadcast.to(roomId).emit(SocketEvent.VIDEO_CALL_END, {
-			from: user.username
+			// Broadcast to all users in the room except the sender
+			socket.broadcast.to(user.roomId).emit(SocketEvent.VIDEO_CALL_START, {
+				from: user.username,
+				peerId: socket.id,
+			})
 		})
-	})
 
-	socket.on(SocketEvent.VIDEO_ANSWER, ({ answer, to }) => {
-		// Forward the answer to the specific peer
-		io.to(to).emit(SocketEvent.VIDEO_ANSWER, {
-			from: socket.id,
-			answer
-		})
-	})
+		socket.on(SocketEvent.VIDEO_CALL_END, () => {
+			const user = getCurrentUser()
+			if (!user) return
 
-	socket.on(SocketEvent.ICE_CANDIDATE, ({ candidate, to }) => {
-		// Forward ICE candidate to the specific peer
-		io.to(to).emit(SocketEvent.ICE_CANDIDATE, {
-			from: socket.id,
-			candidate
+			// Broadcast to all users in the room
+			socket.broadcast.to(user.roomId).emit(SocketEvent.VIDEO_CALL_END, {
+				from: user.username,
+			})
+		})
+
+		socket.on(SocketEvent.VIDEO_ANSWER, ({ answer, to }) => {
+			// Forward the answer to the specific peer
+			io.to(to).emit(SocketEvent.VIDEO_ANSWER, {
+				from: socket.id,
+				answer,
+			})
+		})
+
+		socket.on(SocketEvent.ICE_CANDIDATE, ({ candidate, to }) => {
+			// Forward ICE candidate to the specific peer
+			io.to(to).emit(SocketEvent.ICE_CANDIDATE, {
+				from: socket.id,
+				candidate,
+			})
 		})
 	})
-})
+}
 
 const PORT = process.env.PORT || 3000
 
@@ -305,6 +395,42 @@ app.get("/", (req: Request, res: Response) => {
 	res.sendFile(path.join(__dirname, "..", "public", "index.html"))
 })
 
-server.listen(PORT, () => {
-	console.log(`Listening on port ${PORT}`)
+async function shutdown(
+	signal: string,
+	clusterState: SocketClusterState
+): Promise<void> {
+	console.log(`${signal} received. Shutting down gracefully...`)
+
+	await closeSocketCluster(clusterState)
+
+	await new Promise<void>((resolve) => {
+		server.close(() => {
+			resolve()
+		})
+	})
+
+	process.exit(0)
+}
+
+async function startServer(): Promise<void> {
+	const clusterState = await setupSocketCluster(io)
+
+	registerSocketHandlers(clusterState)
+
+	server.listen(PORT, () => {
+		console.log(`Listening on port ${PORT}`)
+	})
+
+	process.on("SIGINT", () => {
+		void shutdown("SIGINT", clusterState)
+	})
+
+	process.on("SIGTERM", () => {
+		void shutdown("SIGTERM", clusterState)
+	})
+}
+
+void startServer().catch((error) => {
+	console.error("Failed to start server:", error)
+	process.exit(1)
 })

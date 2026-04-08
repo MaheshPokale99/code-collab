@@ -7,7 +7,7 @@
         "skipLibCheck": true,
 
         /* Bundler mode */
-        "moduleResolution": "Node",
+        "moduleResolution": "Bundler",
         "allowImportingTsExtensions": true,
         "resolveJsonModule": true,
         "isolatedModules": false,
@@ -23,9 +23,8 @@
         "allowSyntheticDefaultImports": true,
         "esModuleInterop": true,
 
-        "baseUrl": ".",
         "paths": {
-            "@/*": ["src/*"],
+            "@/*": ["./src/*"],
         },
     },
     "include": ["src"],

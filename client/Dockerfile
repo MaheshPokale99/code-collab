@@ -28,4 +28,4 @@ COPY --from=builder /build/node_modules ./node_modules
 EXPOSE 5173
 
 # Start the server
-CMD ["npx", "serve", "-s", "dist", "-l", "5173"]
+CMD ["npm", "run", "start"]

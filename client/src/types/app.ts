@@ -1,7 +1,7 @@
-import { StoreSnapshot, TLRecord } from "@tldraw/tldraw"
+import { TLEditorSnapshot } from "@tldraw/editor"
 import { RemoteUser, User, USER_STATUS } from "./user"
 
-type DrawingData = StoreSnapshot<TLRecord> | null
+type DrawingData = TLEditorSnapshot | null
 
 enum ACTIVITY_STATE {
     CODING = "coding",

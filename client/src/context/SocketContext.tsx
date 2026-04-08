@@ -28,7 +28,43 @@ export const useSocket = (): SocketContextType => {
     return context
 }
 
-const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || "http://localhost:3000"
+function getBackendUrl(): string {
+    const defaultBackendUrl =
+        import.meta.env.VITE_BACKEND_URL || "http://localhost:3000"
+
+    if (typeof window === "undefined") {
+        return defaultBackendUrl
+    }
+
+    const searchParams = new URLSearchParams(window.location.search)
+    const explicitBackend = searchParams.get("backend")
+
+    if (explicitBackend) {
+        return explicitBackend
+    }
+
+    const backendInstance = searchParams.get("backendInstance")
+
+    if (backendInstance === "1") {
+        return "http://127.0.0.1:4101"
+    }
+
+    if (backendInstance === "2") {
+        return "http://127.0.0.1:4102"
+    }
+
+    return defaultBackendUrl
+}
+
+const BACKEND_URL = getBackendUrl()
+
+const SOCKET_TRANSPORTS = import.meta.env.VITE_SOCKET_TRANSPORTS
+    ?.split(",")
+    .map((transport: string) => transport.trim())
+    .filter(
+        (transport: string): transport is "polling" | "websocket" =>
+            transport === "polling" || transport === "websocket",
+    )
 
 const SocketProvider = ({ children }: { children: ReactNode }) => {
     const {
@@ -57,6 +93,10 @@ const SocketProvider = ({ children }: { children: ReactNode }) => {
             timeout: 10000,
             autoConnect: false,
             forceNew: false,
+            transports:
+                SOCKET_TRANSPORTS && SOCKET_TRANSPORTS.length > 0
+                    ? SOCKET_TRANSPORTS
+                    : undefined,
         })
     }
 

@@ -3,6 +3,7 @@ import { useSocket } from "@/context/SocketContext"
 import useWindowDimensions from "@/hooks/useWindowDimensions"
 import { SocketEvent } from "@/types/socket"
 import { useCallback, useEffect } from "react"
+import { getSnapshot, loadSnapshot } from "@tldraw/editor"
 import { HistoryEntry, RecordsDiff, TLRecord, Tldraw, useEditor } from "tldraw"
 
 function DrawingEditor() {
@@ -29,7 +30,7 @@ function ReachEditor() {
         (change: HistoryEntry<TLRecord>) => {
             const snapshot = change.changes
             // Update the drawing data in the context
-            setDrawingData(editor.store.getSnapshot())
+            setDrawingData(getSnapshot(editor.store))
             // Emit the snapshot to the server
             socket.emit(SocketEvent.DRAWING_UPDATE, { snapshot })
         },
@@ -53,7 +54,7 @@ function ReachEditor() {
                 }
             })
 
-            setDrawingData(editor.store.getSnapshot())
+            setDrawingData(getSnapshot(editor.store))
         },
         [editor.store, setDrawingData],
     )
@@ -61,7 +62,7 @@ function ReachEditor() {
     useEffect(() => {
         // Load the drawing data from the context
         if (drawingData && Object.keys(drawingData).length > 0) {
-            editor.store.loadSnapshot(drawingData)
+            loadSnapshot(editor.store, drawingData)
         }
     }, [])
 

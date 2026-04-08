@@ -216,6 +216,18 @@ server/
 ```env
 PORT=3000
 NODE_ENV=development
+REDIS_ADDR=127.0.0.1:6379
+REDIS_PASSWORD=your-redis-password
+REDIS_URL=redis://localhost:6379
+# You can use REDIS_ADDR, REDIS_URL, or REDIS_HOST / REDIS_PORT
+# REDIS_USERNAME is optional
+
+# Optional: keep username reservations alive across clustered servers
+REDIS_USERNAME_TTL_SECONDS=45
+
+# Optional: use websocket-only mode when your load balancer does not support sticky sessions
+SOCKET_IO_TRANSPORTS=websocket
+VITE_SOCKET_TRANSPORTS=websocket
 ```
 
 #### Frontend (vite.config.mts)
@@ -263,6 +275,21 @@ npm run dev      # Development with hot reload
 1. Build the frontend: `npm run build`
 2. Build the backend: `npm run build`
 3. Deploy to your hosting provider
+
+### Scaling Socket.IO Across Multiple Servers
+1. Point every backend instance at the same Redis deployment using `REDIS_ADDR`, `REDIS_URL`, or `REDIS_HOST`.
+2. Put your backend instances behind a load balancer.
+3. Use sticky sessions at the load balancer, or set both `SOCKET_IO_TRANSPORTS=websocket` and `VITE_SOCKET_TRANSPORTS=websocket`.
+4. Start as many backend instances as you need; room broadcasts, direct socket emits, typing state, chat, drawing sync, and file sync will propagate through Redis.
+
+### Cluster Check
+1. Set your Redis credentials in `server/.env`.
+2. Run `npm run check:cluster` from the `server` directory.
+3. The script will auto-start two backend instances, connect two Socket.IO test clients, and verify:
+   - cross-server room join events
+   - cluster-wide room user lists
+   - direct socket-to-socket sync across instances
+   - cross-server chat delivery
 
 ## 🤝 Contributing
 

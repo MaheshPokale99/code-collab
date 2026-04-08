@@ -32,11 +32,28 @@ const defaultSettings: Settings = {
     showGitHubCorner: true,
 }
 
+function getStoredSettings(getItem: (key: string) => string | null): Partial<Settings> {
+    const rawSettings = getItem("settings")
+
+    if (!rawSettings) {
+        return {}
+    }
+
+    try {
+        const parsedSettings = JSON.parse(rawSettings)
+        return parsedSettings && typeof parsedSettings === "object"
+            ? parsedSettings as Partial<Settings>
+            : {}
+    } catch (error) {
+        console.warn("Invalid settings found in localStorage. Falling back to defaults.", error)
+        localStorage.removeItem("settings")
+        return {}
+    }
+}
+
 function SettingContextProvider({ children }: { children: ReactNode }) {
     const { getItem } = useLocalStorage()
-    const storedSettings: Partial<Settings> = JSON.parse(
-        getItem("settings") || "{}",
-    )
+    const storedSettings = getStoredSettings(getItem)
     
     // Validate theme against available themes
     const availableThemes = Object.keys(editorThemes)

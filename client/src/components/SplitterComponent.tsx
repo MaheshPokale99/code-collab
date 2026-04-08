@@ -7,7 +7,7 @@ import Split from "react-split"
 function SplitterComponent({ children }: { children: ReactNode }) {
     const { isSidebarOpen } = useViews()
     const { isMobile, width } = useWindowDimensions()
-    const { setItem, getItem } = useLocalStorage()
+    const { setItem, getItem, removeItem } = useLocalStorage()
 
     const getGutter = () => {
         const gutter = document.createElement("div")
@@ -21,7 +21,21 @@ function SplitterComponent({ children }: { children: ReactNode }) {
         const savedSizes = getItem("editorSizes")
         let sizes = [25, 75]
         if (savedSizes) {
-            sizes = JSON.parse(savedSizes)
+            try {
+                const parsedSizes = JSON.parse(savedSizes)
+                if (
+                    Array.isArray(parsedSizes) &&
+                    parsedSizes.every((size) => typeof size === "number")
+                ) {
+                    sizes = parsedSizes
+                }
+            } catch (error) {
+                console.warn(
+                    "Invalid editor sizes found in localStorage. Falling back to defaults.",
+                    error,
+                )
+                removeItem("editorSizes")
+            }
         }
         return isSidebarOpen ? sizes : [0, width]
     }

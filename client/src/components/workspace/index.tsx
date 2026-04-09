@@ -3,14 +3,10 @@ import useResponsive from "@/hooks/useResponsive"
 import { ACTIVITY_STATE } from "@/types/app"
 import DrawingEditor from "../drawing/DrawingEditor"
 import EditorComponent from "../editor/EditorComponent"
-import { useState } from "react"
-import { LuPhone } from "react-icons/lu"
-import VideoCall from "@/components/video/VideoCall"
 
 function WorkSpace() {
     const { viewHeight } = useResponsive()
-    const { activityState, users } = useAppContext()
-    const [isVideoCallOpen, setIsVideoCallOpen] = useState(false)
+    const { activityState } = useAppContext()
 
     return (
         <div className="relative flex-1 overflow-hidden">
@@ -27,23 +23,6 @@ function WorkSpace() {
                     )}
                 </div>
             </div>
-
-            {/* Floating Video Call Button */}
-            {users.length > 1 && (
-                <button
-                    onClick={() => setIsVideoCallOpen(true)}
-                    className="fixed bottom-6 right-6 z-40 flex h-14 w-14 items-center justify-center rounded-full bg-green-600 hover:bg-green-700 text-white shadow-lg transition-all duration-200 hover:scale-110"
-                    title="Start Video Call"
-                >
-                    <LuPhone size={24} />
-                </button>
-            )}
-
-            {/* Video Call Modal */}
-            <VideoCall 
-                isOpen={isVideoCallOpen} 
-                onClose={() => setIsVideoCallOpen(false)} 
-            />
         </div>
     )
 }

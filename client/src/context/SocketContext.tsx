@@ -12,7 +12,6 @@ import {
     useContext,
     useEffect,
     useRef,
-    useState,
 } from "react"
 import { toast } from "react-hot-toast"
 import { Socket, io } from "socket.io-client"
@@ -75,20 +74,15 @@ const SocketProvider = ({ children }: { children: ReactNode }) => {
         drawingData,
         setDrawingData,
         currentUser,
-        status,
     } = useAppContext()
 
     // Use useRef to maintain a stable socket instance
     const socketRef = useRef<Socket | null>(null)
-    const [isConnecting, setIsConnecting] = useState(false)
-    const reconnectAttempts = useRef(0)
-    const maxReconnectAttempts = 5
 
     // Initialize socket if not already initialized
     if (!socketRef.current) {
-        console.log("Initializing socket connection...")
         socketRef.current = io(BACKEND_URL, {
-            reconnectionAttempts: maxReconnectAttempts,
+            reconnectionAttempts: 5,
             reconnectionDelay: 1000,
             timeout: 10000,
             autoConnect: false,
@@ -106,45 +100,38 @@ const SocketProvider = ({ children }: { children: ReactNode }) => {
             setStatus(USER_STATUS.CONNECTION_FAILED)
             toast.dismiss()
             toast.error("Failed to connect to the server. Please try again.")
-            setIsConnecting(false)
         },
         [setStatus],
     )
 
-    const handleConnect = useCallback(() => {
-        console.log("Socket connected successfully")
-        setStatus(USER_STATUS.INITIAL)
-        setIsConnecting(false)
-        reconnectAttempts.current = 0
+    // Keep a ref so the connect handler always sees the latest currentUser
+    // without being re-created on every render (which would cause the useEffect
+    // to re-register listeners on every keystroke).
+    const currentUserRef = useRef(currentUser)
+    useEffect(() => {
+        currentUserRef.current = currentUser
+    })
 
-        // If we were in a room, try to rejoin
-        if (currentUser.roomId && status === USER_STATUS.DISCONNECTED) {
-            console.log("Attempting to rejoin room:", currentUser.roomId)
-            socketRef.current?.emit(SocketEvent.JOIN_REQUEST, currentUser)
+    const handleConnect = useCallback(() => {
+        setStatus(USER_STATUS.INITIAL)
+
+        // If we were in a room before losing the connection, rejoin automatically.
+        const user = currentUserRef.current
+        if (user.roomId && socketRef.current) {
+            socketRef.current.emit(SocketEvent.JOIN_REQUEST, {
+                roomId: user.roomId,
+                username: user.username,
+            })
         }
-    }, [setStatus, currentUser, status])
+    }, [setStatus])
 
     const handleDisconnect = useCallback(() => {
-        console.log("Socket disconnected")
         setStatus(USER_STATUS.DISCONNECTED)
-        setIsConnecting(false)
+    }, [setStatus])
 
-        // Attempt to reconnect if we haven't exceeded max attempts
-        if (reconnectAttempts.current < maxReconnectAttempts) {
-            reconnectAttempts.current++
-            console.log(`Reconnect attempt ${reconnectAttempts.current}/${maxReconnectAttempts}`)
-            setTimeout(() => {
-                if (socketRef.current && !socketRef.current.connected) {
-                    console.log("Attempting to reconnect...")
-                    setIsConnecting(true)
-                    socketRef.current.connect()
-                }
-            }, 1000 * reconnectAttempts.current) // Exponential backoff
-        } else {
-            console.log("Max reconnection attempts reached")
-            setStatus(USER_STATUS.CONNECTION_FAILED)
-            toast.error("Connection lost. Please refresh the page.")
-        }
+    const handleReconnectFailed = useCallback(() => {
+        setStatus(USER_STATUS.CONNECTION_FAILED)
+        toast.error("Connection lost. Please refresh the page.")
     }, [setStatus])
 
     const handleUsernameExist = useCallback(() => {
@@ -198,7 +185,7 @@ const SocketProvider = ({ children }: { children: ReactNode }) => {
         socket.on("connect", handleConnect)
         socket.on("disconnect", handleDisconnect)
         socket.on("connect_error", handleError)
-        socket.on("connect_failed", handleError)
+        socket.on("reconnect_failed", handleReconnectFailed)
 
         // Room event handlers
         socket.on(SocketEvent.USERNAME_EXISTS, handleUsernameExist)
@@ -209,26 +196,22 @@ const SocketProvider = ({ children }: { children: ReactNode }) => {
         socket.on(SocketEvent.REQUEST_DRAWING, handleRequestDrawing)
         socket.on(SocketEvent.SYNC_DRAWING, handleDrawingSync)
 
-        // Connect socket if not connected
-        if (!socket.connected && !isConnecting) {
-            console.log("Connecting socket...")
-            setIsConnecting(true)
+        // Connect the socket once on mount
+        if (!socket.connected) {
             socket.connect()
         }
 
         // Cleanup function
         return () => {
-            console.log("Cleaning up socket event listeners...")
-            socket.off("connect")
-            socket.off("disconnect")
-            socket.off("connect_error")
-            socket.off("connect_failed")
-            socket.off(SocketEvent.USERNAME_EXISTS)
-            socket.off(SocketEvent.JOIN_ACCEPTED)
-            socket.off(SocketEvent.USER_DISCONNECTED)
-            socket.off(SocketEvent.REQUEST_DRAWING)
-            socket.off(SocketEvent.SYNC_DRAWING)
-            // Don't disconnect here, just remove listeners
+            socket.off("connect", handleConnect)
+            socket.off("disconnect", handleDisconnect)
+            socket.off("connect_error", handleError)
+            socket.off("reconnect_failed", handleReconnectFailed)
+            socket.off(SocketEvent.USERNAME_EXISTS, handleUsernameExist)
+            socket.off(SocketEvent.JOIN_ACCEPTED, handleJoiningAccept)
+            socket.off(SocketEvent.USER_DISCONNECTED, handleUserLeft)
+            socket.off(SocketEvent.REQUEST_DRAWING, handleRequestDrawing)
+            socket.off(SocketEvent.SYNC_DRAWING, handleDrawingSync)
         }
     }, [
         handleConnect,
@@ -236,10 +219,10 @@ const SocketProvider = ({ children }: { children: ReactNode }) => {
         handleDrawingSync,
         handleError,
         handleJoiningAccept,
+        handleReconnectFailed,
         handleRequestDrawing,
         handleUserLeft,
         handleUsernameExist,
-        isConnecting,
     ])
 
     return (

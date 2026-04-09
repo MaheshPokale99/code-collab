@@ -1,6 +1,6 @@
 
 import { BsChatSquareText } from "react-icons/bs"
-import { LuCode2, LuFileText, LuSettings, LuUsers, LuPalette, LuPlay, LuPhone } from "react-icons/lu"
+import { LuCode2, LuFileText, LuSettings, LuUsers, LuPalette, LuPlay } from "react-icons/lu"
 import ChatsView from "./ChatsView"
 import CopilotView from "./CopilotView"
 import DrawingView from "./DrawingView"
@@ -42,8 +42,8 @@ export const VIEWS = [
     },
     {
         id: ViewType.VIDEO_CALL,
-        name: "Video Call",
-        icon: LuPhone,
+        name: "Participants",
+        icon: LuUsers,
         component: VideoCallView,
     },
     {
